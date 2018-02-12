@@ -90,6 +90,7 @@ public class RCTMGLMapView extends MapView implements
     private RCTMGLMapViewManager mManager;
     private Context mContext;
     private Handler mHandler;
+    private LifecycleEventListener mLifeCycleListener;
 
     private List<AbstractMapFeature> mFeatures;
     private List<AbstractMapFeature> mQueuedFeatures;
@@ -249,11 +250,23 @@ public class RCTMGLMapView extends MapView implements
         return mFeatures.get(i);
     }
 
-    public void dispose() {
+    public synchronized void dispose() {
+        ReactContext reactContext = (ReactContext) mContext;
+        reactContext.removeLifecycleEventListener(mLifeCycleListener);
+
         if(mLocationLayer != null){
             mLocationLayer.onStop();
         }
+
         mLocationManger.dispose();
+
+        final RCTMGLMapView mapView = this;
+        reactContext.runOnUiQueueThread(new Runnable() {
+            @Override
+            public void run() {
+                mapView.onDestroy();
+            }
+        });
     }
 
     public RCTMGLPointAnnotation getPointAnnotationByID(String annotationID) {
@@ -1021,7 +1034,8 @@ public class RCTMGLMapView extends MapView implements
 
     private void setLifecycleListeners() {
         final ReactContext reactContext = (ReactContext) mContext;
-        reactContext.addLifecycleEventListener(new LifecycleEventListener() {
+
+        mLifeCycleListener = new LifecycleEventListener() {
             @Override
             public void onHostResume() {
                 if (mShowUserLocation && !mLocationManger.isActive()) {
@@ -1041,10 +1055,10 @@ public class RCTMGLMapView extends MapView implements
             @Override
             public void onHostDestroy() {
                 dispose();
-                onDestroy();
-                reactContext.removeLifecycleEventListener(this);
             }
-        });
+        };
+
+        reactContext.addLifecycleEventListener(mLifeCycleListener);
     }
 
     private void enableLocation() {
