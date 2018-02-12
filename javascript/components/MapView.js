@@ -683,7 +683,7 @@ class MapView extends React.Component {
       onUserTrackingModeChange: this.props.onUserTrackingModeChange,
     };
 
-    if (isAndroid() && this.props.textureMode) {
+    if (isAndroid()) {
       return (
         <RCTMGLAndroidTextureMapView {...props} {...callbacks}>
           {this.props.children}
