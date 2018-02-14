@@ -1,6 +1,8 @@
 package com.mapbox.rctmgl.components.mapview;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
 import android.graphics.RectF;
@@ -14,6 +16,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.MotionEvent;
 
+import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
@@ -35,8 +38,10 @@ import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.MapboxMapOptions;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 import com.mapbox.mapboxsdk.maps.UiSettings;
+import com.mapbox.mapboxsdk.net.ConnectivityReceiver;
 import com.mapbox.mapboxsdk.plugins.locationlayer.LocationLayerMode;
 import com.mapbox.mapboxsdk.plugins.locationlayer.LocationLayerPlugin;
+import com.mapbox.mapboxsdk.storage.FileSource;
 import com.mapbox.mapboxsdk.style.layers.Layer;
 import com.mapbox.rctmgl.components.AbstractMapFeature;
 import com.mapbox.rctmgl.components.annotation.RCTMGLCallout;
@@ -91,6 +96,7 @@ public class RCTMGLMapView extends MapView implements
     private Context mContext;
     private Handler mHandler;
     private LifecycleEventListener mLifeCycleListener;
+    private boolean mPaused;
 
     private List<AbstractMapFeature> mFeatures;
     private List<AbstractMapFeature> mQueuedFeatures;
@@ -152,10 +158,13 @@ public class RCTMGLMapView extends MapView implements
     public RCTMGLMapView(Context context, RCTMGLMapViewManager manager, MapboxMapOptions options) {
         super(context, options);
 
-        super.onCreate(null);
-        super.getMapAsync(this);
-
         mContext = context;
+
+        onCreate(null);
+        onStart();
+        onResume();
+        getMapAsync(this);
+
         mManager = manager;
         mCameraUpdateQueue = new CameraUpdateQueue();
 
@@ -171,6 +180,18 @@ public class RCTMGLMapView extends MapView implements
         mHandler = new Handler();
 
         setLifecycleListeners();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        mPaused = false;
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        mPaused = true;
     }
 
     @Override
@@ -260,13 +281,12 @@ public class RCTMGLMapView extends MapView implements
 
         mLocationManger.dispose();
 
-        final RCTMGLMapView mapView = this;
-        reactContext.runOnUiQueueThread(new Runnable() {
-            @Override
-            public void run() {
-                mapView.onDestroy();
-            }
-        });
+        if (!mPaused) {
+            onPause();
+        }
+
+        onStop();
+        onDestroy();
     }
 
     public RCTMGLPointAnnotation getPointAnnotationByID(String annotationID) {
